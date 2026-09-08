@@ -285,12 +285,21 @@
     const PRICE_PER_NIGHT = 5000;          // цена за ночь
     const HOUSE_NAME = "Загородный дом";   // название
 
-    // Занятые даты (пример). Потом можно передавать из бота.
-    // Формат: "YYYY-MM-DD"
-    let occupiedDates = new Set([
-      // "2026-09-15",
-      // "2026-09-16",
-    ]);
+    // Занятые даты приходят из бота через параметр ?occupied=2026-09-15,2026-09-16
+    function loadOccupiedFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      const raw = params.get("occupied") || "";
+      return new Set(
+        raw.split(",")
+          .map(s => s.trim())
+          .filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s))
+      );
+    }
+    let occupiedDates = loadOccupiedFromUrl();
+
+    function toISODate(d) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
 
     // ===== Состояние =====
     let current = new Date();
@@ -340,15 +349,15 @@
       for (let d = 1; d <= daysInMonth; d++) {
         const date = new Date(year, month, d);
         date.setHours(0,0,0,0);
-        const iso = date.toISOString().slice(0, 10);
-
-        const el = document.createElement("div");
-        el.className = "day";
-        el.textContent = d;
+        const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 
         const isPast = date < today;
         const isBusy = occupiedDates.has(iso);
         const isToday = date.getTime() === today.getTime();
+
+        const el = document.createElement("div");
+        el.className = "day";
+        el.textContent = (!isPast && isBusy) ? ("❌" + d) : String(d);
 
         if (isPast) {
           el.classList.add("past");
@@ -393,7 +402,7 @@
           let cur = new Date(checkIn);
           cur.setDate(cur.getDate() + 1);
           while (cur < date) {
-            const iso = cur.toISOString().slice(0, 10);
+            const iso = toISODate(cur);
             if (occupiedDates.has(iso)) {
               ok = false;
               break;
@@ -480,8 +489,8 @@
       }
 
       const payload = {
-        check_in: checkIn.toISOString().slice(0, 10),
-        check_out: checkOut.toISOString().slice(0, 10),
+        check_in: toISODate(checkIn),
+        check_out: toISODate(checkOut),
         nights: nightsCount(),
         total_price: nightsCount() * PRICE_PER_NIGHT,
         banya: banyaToggle.checked,
